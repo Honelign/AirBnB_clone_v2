@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """ Console Module """
 import cmd
+from re import A
 import sys
-import models
 from models.base_model import BaseModel
 from models.__init__ import storage
 from models.user import User
@@ -11,7 +11,6 @@ from models.state import State
 from models.city import City
 from models.amenity import Amenity
 from models.review import Review
-import shlex
 
 
 class HBNBCommand(cmd.Cmd):
@@ -35,7 +34,7 @@ class HBNBCommand(cmd.Cmd):
     def preloop(self):
         """Prints if isatty is false"""
         if not sys.__stdin__.isatty():
-            print('(hbnb)')
+            print('(hbnb) ', end='')
 
     def precmd(self, line):
         """Reformat command line for advanced command syntax.
@@ -43,6 +42,7 @@ class HBNBCommand(cmd.Cmd):
         (Brackets denote optional fields in usage example.)
         """
         _cmd = _cls = _id = _args = ''  # initialize line elements
+
         # scan for general formating - i.e '.', '(', ')'
         if not ('.' in line and '(' in line and ')' in line):
             return line
@@ -113,46 +113,40 @@ class HBNBCommand(cmd.Cmd):
         """ Overrides the emptyline method of CMD """
         pass
 
-    def dic_create(self, args):
-        """creates a dictionary from a list"""
-        dic = {}
-        for arg in args:
-            if "=" in arg:
-                vals_toa_add = arg.split('=', 1)
-                key = vals_toa_add[0]
-                value = vals_toa_add[1]
-                if value[0] == value[-1] == '"':
-                    value = value.replace('"', '').replace('_', ' ')
-                else:
-                    try:
-                        value = int(value)
-                    except:
-                        try:
-                            value = float(value)
-                        except:
-                            continue
-                dic[key] = value
-        return (dic)
-
     def do_create(self, args):
-        """Creates a new instance of BaseModel """
-        args = args.split()
-        if len(args) == 0:
+        """ Create an object of any class"""
+        if not args:
             print("** class name missing **")
             return
-        if args[0] in HBNBCommand.classes:
-            dic = self.dic_creator(args[1:])
-            instance = HBNBCommand.classes[args[0]](**dic)
-        else:
+        # For default split(\n \t o \r).
+        tokens = args.split()
+        class_name = tokens[0]
+        if class_name not in HBNBCommand.classes:
             print("** class doesn't exist **")
             return
-        print(instance.id)
-        instance.save()
+        new_instance = HBNBCommand.classes[class_name]()
+        for token in tokens:
+            if token != class_name:
+                (key, value) = token.split(sep='=', maxsplit=1)
+                # Info: All underscores _ must be replace by spaces.
+                value = value.replace('_', ' ')
+                # Info: Remove "".
+                value = value.replace("\"", '')
+                try:
+                    # Info! Parse value in type of data.
+                    tmp_value = eval(value)
+                    value = tmp_value
+                except BaseException:
+                    pass
+                setattr(new_instance, key, value)
+        storage.new(new_instance)
+        storage.save()
+        print(new_instance.id)
 
     def help_create(self):
         """ Help information for the create method """
         print("Creates a class of any type")
-        print("[Usage]: create <className>\n")
+        print("[Usage]: create <className> <param 1> <param 2> <param 3>...\n")
 
     def do_show(self, args):
         """ Method to show an individual object """
@@ -223,18 +217,17 @@ class HBNBCommand(cmd.Cmd):
     def do_all(self, args):
         """ Shows all objects, or all objects of a class"""
         print_list = []
+
         if args:
             args = args.split(' ')[0]  # remove possible trailing args
             if args not in HBNBCommand.classes:
                 print("** class doesn't exist **")
                 return
             for k, v in storage.all(HBNBCommand.classes[args]).items():
-            # for k, v in storage._FileStorage__objects.items():
-                # if k.split('.')[0] == args:
-                print_list.append(str(v))
+                if k.split('.')[0] == args:
+                    print_list.append(str(v))
         else:
             for k, v in storage.all().items():
-            # for k, v in storage._FileStorage__objects.items():
                 print_list.append(str(v))
 
         print(print_list)
